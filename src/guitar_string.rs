@@ -1,9 +1,6 @@
-// import queue data structure from standard library
-use std::collections::VecDeque;
-// import random number generator from standard library
-use rand::prelude::*;
-// import uniform distribution from rand crate
 use rand::distributions::Uniform;
+use rand::prelude::*;
+use std::collections::VecDeque;
 
 const DECAY_FACTOR: f64 = 0.996;
 
@@ -14,7 +11,7 @@ pub struct GuitarString {
 
     //uniform distribution and random number generator
     m_rng: ThreadRng,
-    m_uniform: Uniform<f64>
+    m_uniform: Uniform<f64>,
 }
 
 impl GuitarString {
@@ -35,7 +32,7 @@ impl GuitarString {
             m_capacity: capacity,
             m_time: 0,
             m_rng: rng,
-            m_uniform: uniform
+            m_uniform: uniform,
         }
     }
 
@@ -60,3 +57,4 @@ impl GuitarString {
         self.m_ring_buffer.front().unwrap().clone()
     }
 }
+

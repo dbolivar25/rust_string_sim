@@ -1,7 +1,9 @@
+use crate::guitar_string::GuitarString;
+use anyhow::{Context, Result};
+use itertools::Itertools;
+use std::env::{self, args};
 use std::fs::File;
 use std::io::{BufRead, Write};
-use anyhow::{Context, Result};
-use crate::guitar_string::GuitarString;
 
 // link guitar_string.rs
 mod guitar_string;
@@ -11,20 +13,14 @@ const NUM_STRINGS: usize = 37;
 const STEP: f64 = 1.0 / SAMPLE_RATE as f64;
 const END_OF_SONG: i32 = -1;
 
-fn open_files(args: &Vec<String>) -> Result<(File, File)> {
-    // get input and output file names from command line
-    let infile = &args[1];
-    let outfile = &args[2];
+fn open_files(in_file: &str, out_file: &str) -> Result<(File, File)> {
+    let in_file = File::open(in_file).context("Could not open input file")?;
+    let mut out_file = File::create(out_file).context("Could not open output file")?;
 
-    // open input and output files
-    let in_file = File::open(infile).context("Could not open input file")?;
-    let mut out_file = File::create(outfile).context("Could not open output file")?;
+    out_file
+        .write_all(format!("; Sample Rate {}\n; Channels 1\n\n", SAMPLE_RATE).as_bytes())
+        .context("Could not write header to output file")?;
 
-    // write header to output file
-    let header = format!("; Sample Rate {}\n; Channels 1\n\n", SAMPLE_RATE);
-    out_file.write_all(header.as_bytes()).context("Could not write header to output file")?;
-
-    // return input and output files
     return Ok((in_file, out_file));
 }
 
@@ -35,18 +31,7 @@ fn close_files(in_file: File, out_file: File) -> Result<()> {
     return Ok(());
 }
 
-fn create_strings() -> Result<Vec<GuitarString>> {
-    let mut strings = Vec::new();
-    for i in 0..37 {
-        strings.push(GuitarString::new(440.0 *
-            2.0_f64.powf((i as f64 - 24.0) / 12.0)));
-    }
-
-    return Ok(strings);
-}
-
 fn validate_line(prev_time: f64, time: f64, note: i32) -> Result<()> {
-
     if time < prev_time {
         return Err(anyhow::anyhow!("Time must be increasing"));
     }
@@ -59,23 +44,32 @@ fn validate_line(prev_time: f64, time: f64, note: i32) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let args: Vec<String> = std::env::args().collect();
+    let args = args().collect_vec();
+    if args.len() != 3 {
+        println!(
+            "Usage: {} <input_file> <output_file>",
+            args[0].split('/').last().unwrap()
+        );
+        return Err(anyhow::anyhow!("Invalid number of arguments"));
+    }
 
-    let (in_file, mut out_file) = open_files(&args)?;
-    let mut strings = create_strings()?;
+    let (in_file, mut out_file) = open_files(&args[1], &args[2])?;
+    let mut strings = (0..NUM_STRINGS)
+        .map(|i| GuitarString::new(440.0 * 2.0_f64.powf((i as f64 - 24.0) / 12.0)))
+        .collect_vec();
 
     print!("Processing {} into {}", &args[1], &args[2]);
 
     // read input file line by line
     let mut reader = std::io::BufReader::new(&in_file);
-    let mut line = String::new();
+    let mut buf = String::new();
 
-    reader.read_line(&mut line).unwrap();
+    reader.read_line(&mut buf).unwrap();
 
     let mut time_counter = 0.0;
     let mut sample_sum;
 
-    let mut parts = line.split_whitespace();
+    let mut parts = buf.split_whitespace();
     let mut time = parts.next().unwrap().parse::<f64>().unwrap();
     let mut note = parts.next().unwrap().parse::<i32>().unwrap();
 
@@ -97,10 +91,10 @@ fn main() -> Result<()> {
 
                 prev_time = time;
 
-                line.clear();
+                buf.clear();
 
-                if reader.read_line(&mut line).unwrap() > 0 {
-                    parts = line.split_whitespace();
+                if reader.read_line(&mut buf).unwrap() > 0 {
+                    parts = buf.split_whitespace();
                     time = parts.next().unwrap().parse::<f64>().unwrap();
                     note = parts.next().unwrap().parse::<i32>().unwrap();
                 } else {

@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.68"
+itertools = "0.12.1"
 rand = "0.8.4"
